@@ -1,31 +1,45 @@
-import socketserver
+import socket
+import selectors
+sel = selectors.DefaultSelector()
+host = '127.0.0.1'  # The server's hostname or IP address
+port = 65432 
 
-class MyTCPHandler(socketserver.BaseRequestHandler):
-    """
-    The request handler class for our server.
+#
+#def accept_wrapper(sock):
+#    conn, addr = sock.accept()  # Should be ready to read
+#    print('accepted connection from', addr)
+#    conn.setblocking(False)
+#    data = types.SimpleNamespace(addr=addr, inb=b'', outb=b'')
+#    events = selectors.EVENT_READ | selectors.EVENT_WRITE
+#    sel.register(conn, events, data=data)
 
-    It is instantiated once per connection to the server, and must
-    override the handle() method to implement communication to the
-    client.
-    """
 
-    def handle(self):
-        # self.rfile is a file-like object created by the handler;
-        # we can now use e.g. readline() instead of raw recv() calls
-        self.data = self.rfile.readline().strip()
-        print("{} wrote:".format(self.client_address[0]))
-        print(self.data)
-        # Likewise, self.wfile is a file-like object used to write back
-        # to the client
-        self.wfile.write(self.data.upper())
-        
-if __name__ == "__main__":
-    print('hello')
-    HOST, PORT = "localhost", 9999
+def service_connection(key, mask):
+    sock = key.fileobj
+    data = key.data
+    if mask & selectors.EVENT_READ:
+        recv_data = sock.recv(1024)  # Should be ready to read
+        if recv_data:
+            data.outb += recv_data
+        else:
+            print('closing connection to', data.addr)
+            sel.unregister(sock)
+            sock.close()
+    if mask & selectors.EVENT_WRITE:
+        if data.outb:
+            print('echoing', repr(data.outb), 'to', data.addr)
+            sent = sock.send(data.outb)  # Should be ready to write
+            data.outb = data.outb[sent:]
 
-    # Create the server, binding to localhost on port 9999
-    with socketserver.TCPServer((HOST, PORT), MyTCPHandler) as server:
-        # Activate the server; this will keep running until you
-        # interrupt the program with Ctrl-C
-        print('hello from the server')
-        server.serve_forever()
+# ...
+lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+lsock.bind((host, port))
+lsock.listen()
+print('listening on', (host, port))
+lsock.setblocking(False)
+sel.register(lsock, selectors.EVENT_READ, data=None)
+
+while True:
+    events = sel.select(timeout=None)
+    for key, mask in events:
+        service_connection(key, mask)
