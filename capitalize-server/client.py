@@ -12,7 +12,7 @@ import socket
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
     # Connecting to the server at port 9899
     sock.connect(('localhost', 9899))
-    print('Operations you can do\n 1. set <KEY> <VALUE>\n 2. get <KEY>\n')
+    print('Operations you can do\n 1. set <key> <size>\n <pyaload>\n 2. get <KEY>\n')
     # Client kept alive for multiple get and set requests
     while True:
         line = sys.stdin.readline()
@@ -20,7 +20,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             break
         sock.sendall(f'{line}'.encode('utf-8'))
         while True:
-            data = sock.recv(50)
+            data = sock.recv(128)
             print(data.decode("utf-8"), end='')
-            if len(data) < 50:
+            if len(data) < 128:
                 break

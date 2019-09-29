@@ -15,7 +15,20 @@ import socketserver
 import threading
 from database import Database
 
-d = Database()
+db = Database()
+
+VALID_GET = "VALID_GET"
+INVALID_GET = "INVALID_GET"
+
+VALID_SET = "VALID_SET"
+INVALID_SET  = "INVALID_SET"
+
+GET_COMMAND = "get"
+SET_COMMAND = "set"
+
+ENCODING = 'utf-8'
+
+INVALID_COMMAND = "INVALID_COMMAND"
 
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -28,54 +41,95 @@ class KeyValueHandler(socketserver.StreamRequestHandler):
     # Overriding the handle funtion
     # When this method is finished wfile gets flushed by itself
     
+    def store_data(self, key, value):
+#        SET OPERATION
+        # Assuming that the operation will not fail
+        storing_failed = False
+        try:
+            db.set_value(key,value)
+        except:
+            # Operation failed
+            storing_failed = True
+        if storing_failed:
+            # Message when operation failed
+            self.wfile.write("NOT-STORED\r\n".encode())
+        else:
+            print("Stored Data for " + self.thread)
+            print("KEY: ", key)
+            print("VALUE: ", value)
+            # Message when operation is successful
+            self.wfile.write("STORED\r\n".encode())
+
+    def check_command(self, command):
+        split_value = command.split()
+#        self.wfile.write((split_value[0] + "\r\n").encode())
+        if len(split_value) > 0:
+            if split_value[0] == GET_COMMAND:
+                if len(split_value) == 2:
+                    return 'get'
+                else:
+                    self.wfile.write(f"GET COMMAND SHOULD BE OF FORMAT\nget <key>\r\n".encode());
+                    print("GET COMMAND SHOULD BE OF FORMAT")
+                    print("get <key>")
+                    return INVALID_GET
+            if split_value[0] == SET_COMMAND:
+                if len(split_value) == 3:
+                    return 'set'
+                else:
+                    self.wfile.write(f"SET COMMAND SHOULD BE OF FORMAT\nset <key> <size>\n<payload>\r\n".encode());
+                    print("SET COMMAND SHOULD BE OF FORMAT")
+                    print("set <key> <size>")
+                    print("<payload>")
+                    return INVALID_SET
+            else:
+                return INVALID_COMMAND
+        else:
+            return INVALID_COMMAND
+        
+
     def handle(self):
-        thread = threading.current_thread().getName()
-        print(f'Client connected on thread:' + thread)
+        self.thread = threading.current_thread().getName()
+        print(f'Client connected on thread:' + self.thread)
         while True:
-            data = self.rfile.next()
-            
+            while True:
+                operation = "none"
+                first = self.rfile.readline()
+                value = ""
+                command = self.check_command(first.decode(ENCODING))
+                if command != INVALID_COMMAND:
+                    
+                    if command == SET_COMMAND:
+                        operation, key, size = first.decode(ENCODING).split()
+                        print('Waiting for payload from ' + self.thread )
+                        self.wfile.write("\r\n".encode())
+                        value = self.rfile.readline()
+                        self.store_data(key, value.decode(ENCODING))
+                        break
+                    
+                    elif command == GET_COMMAND:
+                        print('GET OPERATION BY ' + self.thread)
+                        operation, key = first.decode(ENCODING).split()
+                        value, size = db.get_value(key)
+                        if value:
+                            # returning the value if it exist
+#                            self.wfile.write("VALUE " + key+" "+size +"\n"+ value + "\nEND\r\n".encode(ENCODING))
+                            self.wfile.write(f"VALUE {key} {size}\r\n{value}\r\n".encode());
+                        else:
+                            # Case when key not found
+                            self.wfile.write("KEY NOT FOUND\r\n".encode())
+                            break
+                else:
+                    print("INVALID OPERATION BY " + self.thread)
+                    self.wfile.write("COMMAND FORMAT NOT CORRECT\r\n".encode())
+                    break
+                
             # this will only be empty if the client disconnects, empty string will also be appended with '\n'
             # hence this would work even if the client sends the empty string
             # it breaks the loop if client disconnects
-            if not data:
+            if not first:
                 break
-            split_data = data.decode('utf-8').split()
-            try:
-                operation = split_data[0]
-                key = split_data[1]
-                value = split_data[2]
-            except:
-                self.wfile.write("COMMAND FORMAT NOT CORRECT, <Operation> <key> <value>? \r\n".encode())
-           
-            if operation == "set":
-                # SET OPERATION
-                # Assuming that the operation will not fail
-                storing_failed = False
-                try:
-                    d.set_value(key,value)
-                except:
-                    # Operation failed
-                    storing_failed = True
-                if storing_failed:
-                    # Message when operation failed
-                    self.wfile.write("NOT-STORED\r\n".encode())
-                else:
-                    # Message when operation is successful
-                    self.wfile.write("STORED\r\n".encode())
-                # Get operation
-            elif operation == "get":
-                value = d.get_value(key)
-                if value:
-                    # returning the value if it exist
-                    self.wfile.write(value.encode('utf-8'))
-                else:
-                    # Case when key not found
-                    self.wfile.write("KEY NOT FOUND\r\n".encode())
-            else:
-                # if operation is not set or get
-                self.wfile.write("NOT VALID COMMAND\r\n".encode())
         
-        print("Client closed on thread" + thread)
+        print("Client closed on thread" + self.thread)
         
 with ThreadedTCPServer(('localhost', 9899), KeyValueHandler) as server:
     print('Waiting for the clients')

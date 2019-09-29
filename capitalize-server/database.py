@@ -39,7 +39,8 @@ class Database:
             reader = csv.DictReader(f)
             for row in reversed(list(reader)):
                 if row['key'] == key:
-                    return row['value'] + "\r\n"
+                    return row['value'], row['size']
+        return None, None
 
 if __name__ == "__main__":
     d = Database()
