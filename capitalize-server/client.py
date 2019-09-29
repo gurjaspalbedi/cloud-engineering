@@ -20,7 +20,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             break
         sock.sendall(f'{line}'.encode('utf-8'))
         while True:
-            data = sock.recv(128)
+            data = sock.recv(1024)
             print(data.decode("utf-8"), end='')
-            if len(data) < 128:
+            if len(data) < 2014:
                 break
