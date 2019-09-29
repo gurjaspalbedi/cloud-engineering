@@ -1,22 +1,26 @@
 import sys
 import socket
 
+#REFERENCES
+#https://realpython.com/python-csv/
+#https://realpython.com/python-sockets/
 #https://cs.lmu.edu/~ray/notes/pythonnetexamples/
-if len(sys.argv) != 2:
-    print('Pass the server IP as the sole command line argument')
-else:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect((sys.argv[1], 59899))
-        print('Enter lines of text then Ctrl+D or Ctrl+C to quit')
+#https://realpython.com/read-write-files-python/
+#https://realpython.com/python-sockets/
+
+#AF_INET - IPv4 and SOCK_STREAM - TCP
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    # Connecting to the server at port 9899
+    sock.connect(('localhost', 9899))
+    print('Operations you can do\n 1. set <KEY> <VALUE>\n 2. get <KEY>\n')
+    # Client kept alive for multiple get and set requests
+    while True:
+        line = sys.stdin.readline()
+        if not line:
+            break
+        sock.sendall(f'{line}'.encode('utf-8'))
         while True:
-            line = sys.stdin.readline()
-            if not line:
-                # End of standard input, exit this entire script
+            data = sock.recv(50)
+            print(data.decode("utf-8"), end='')
+            if len(data) < 50:
                 break
-            sock.sendall(f'{line}'.encode('utf-8'))
-            while True:
-                data = sock.recv(128)
-                print(data.decode("utf-8"), end='')
-                if len(data) < 128:
-                    # No more of this message, go back to waiting for next message
-                    break
