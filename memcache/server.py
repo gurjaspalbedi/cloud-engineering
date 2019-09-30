@@ -32,8 +32,6 @@ INVALID_COMMAND = "INVALID_COMMAND"
 
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    # Threaded TCP to server multiple clients and for concurrency
-    
     daemon_threads = True
     allow_reuse_address = True
 
@@ -41,12 +39,12 @@ class KeyValueHandler(socketserver.StreamRequestHandler):
     # Overriding the handle funtion
     # When this method is finished wfile gets flushed by itself
     
-    def store_data(self, key, value):
+    def store_data(self, key, value, size):
 #        SET OPERATION
         # Assuming that the operation will not fail
         storing_failed = False
         try:
-            db.set_value(key,value)
+            db.set_value(key,value, size)
         except:
             # Operation failed
             storing_failed = True
@@ -103,7 +101,7 @@ class KeyValueHandler(socketserver.StreamRequestHandler):
                         print('Waiting for payload from ' + self.thread )
                         self.wfile.write("\r\n".encode())
                         value = self.rfile.readline()
-                        self.store_data(key, value.decode(ENCODING))
+                        self.store_data(key, value.decode(ENCODING), size)
                         break
                     
                     elif command == GET_COMMAND:
@@ -113,7 +111,7 @@ class KeyValueHandler(socketserver.StreamRequestHandler):
                         if value:
                             # returning the value if it exist
 #                            self.wfile.write("VALUE " + key+" "+size +"\n"+ value + "\nEND\r\n".encode(ENCODING))
-                            self.wfile.write(f"VALUE {key} {size}\r\n{value}\r\n".encode());
+                            self.wfile.write(f"VALUE {key} {size}\r\n{value}\r\nEND\r\n".encode());
                         else:
                             # Case when key not found
                             self.wfile.write("KEY NOT FOUND\r\n".encode())
